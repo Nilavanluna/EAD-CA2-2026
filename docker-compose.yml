@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: recipe-mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - recipe-net
+
+  backend:
+    build: ./EAD_BE_CA2
+    container_name: recipe-be
+    ports:
+      - '8080:8080'
+    environment:
+      - SPRING_DATA_MONGODB_HOST=mongodb
+      - SPRING_DATA_MONGODB_PORT=27017
+    depends_on:
+      - mongodb
+    networks:
+      - recipe-net
+
+  frontend:
+    build: ./EAD_FE_CA2
+    container_name: recipe-fe
+    ports:
+      - '22137:22137'
+    environment:
+      - WEBSERVICE_HOST=backend
+      - WEBSERVICE_PORT=8080
+    depends_on:
+      - backend
+    networks:
+      - recipe-net
+
+volumes:
+  mongo-data:
+
+networks:
+  recipe-net:
+    driver: bridge
