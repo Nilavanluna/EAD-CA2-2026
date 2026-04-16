@@ -1,0 +1,16 @@
+# Node
+EAD_FE_CA2/node_modules/
+EAD_FE_CA2/.env
+
+# Java/Maven
+EAD_BE_CA2/target/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+
+# General
+.DS_Store
+*.env
