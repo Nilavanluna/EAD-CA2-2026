@@ -8,7 +8,8 @@ on:
     paths: ['EAD_FE_CA2/**']
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}/ead-ca2-fe
+  # ✅ FIXED: Manual lowercase repo name
+  IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-fe
 
 jobs:
   test:

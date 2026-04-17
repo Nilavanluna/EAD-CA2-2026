@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: fe
-          image: ghcr.io/YOUR_USERNAME/ead_ca2_2026-fe:latest
+          image: ghcr.io/nilavanluna/ead-ca2-2026-fe:latest # Lowercase repo
           ports:
             - containerPort: 22137
           env:
