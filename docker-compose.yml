@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:6.0
@@ -12,20 +10,23 @@ services:
       - recipe-net
 
   backend:
-    build: ./EAD_BE_CA2
+    build:
+      context: ./EAD_BE_CA2
+      dockerfile: Dockerfile
     container_name: recipe-be
     ports:
       - '8080:8080'
     environment:
-      - SPRING_DATA_MONGODB_HOST=mongodb
-      - SPRING_DATA_MONGODB_PORT=27017
+      - databaseUrl=mongodb://mongodb:27017/?retryWrites=true&w=majority
     depends_on:
       - mongodb
     networks:
       - recipe-net
 
   frontend:
-    build: ./EAD_FE_CA2
+    build:
+      context: ./EAD_FE_CA2
+      dockerfile: Dockerfile
     container_name: recipe-fe
     ports:
       - '22137:22137'

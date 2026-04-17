@@ -1,17 +1,21 @@
+// 1. Loading the config file first to prevent initialization errors
+const config = require('./config/config.json')
+const defaultConfig = config.development
+
+// 2. Override config with environment variables (essential for Docker/Cloud deployment)
 defaultConfig.webservice_host = process.env.WEBSERVICE_HOST || defaultConfig.webservice_host
 defaultConfig.webservice_port = process.env.WEBSERVICE_PORT || defaultConfig.webservice_port
 
+// 3. Set global configuration
+global.gConfig = defaultConfig
+
+// 4. Load required modules
 var http = require('http')
 var url = require('url')
 const { parse } = require('querystring')
 var fs = require('fs')
 
-//Loading the config fileContents
-const config = require('./config/config.json')
-const defaultConfig = config.development
-global.gConfig = defaultConfig
-
-//Generating some constants to be used to create the common HTML elements.
+// Generating some constants to be used to create the common HTML elements.
 var header = '<!doctype html><html>' + '<head>'
 
 var body =
@@ -37,7 +41,7 @@ http
   .createServer(function (req, res) {
     console.log(req.url)
 
-    //This validation needed to avoid duplicated (i.e., twice!) get / calls (due to the favicon.ico)
+    // Avoid duplicated calls (due to the favicon.ico)
     if (req.url === '/favicon.ico') {
       res.writeHead(200, { 'Content-Type': 'image/x-icon' })
       res.end()
@@ -51,71 +55,64 @@ http
       res.write(body)
       res.write(submitButton)
 
-      const http = require('http')
       var timeout = 0
 
-      // If POST, try saving the new recipe first (then still showing the existing recipes).
-      //********************************************************
+      // Handle Form Submission (POST)
       if (req.method === 'POST') {
         timeout = 2000
 
-        //Get the POST data
-        //------------------------------
         var myJSONObject = {}
         var qs = require('querystring')
 
-        let body = ''
+        let postBody = ''
         req.on('data', (chunk) => {
-          body += chunk.toString()
+          postBody += chunk.toString()
         })
+
         req.on('end', () => {
-          var post = qs.parse(body)
+          var post = qs.parse(postBody)
           myJSONObject['name'] = post['name']
           myJSONObject['ingredients'] = post['ingredients'].split(',')
           myJSONObject['prepTimeInMinutes'] = post['prepTimeInMinutes']
 
-          //Send the data to the WS.
-          //------------------------------
+          // Send the data to the Web Service
           const options = {
             hostname: global.gConfig.webservice_host,
             port: global.gConfig.webservice_port,
             path: '/recipe',
             method: 'POST',
-            json: true, // <--Very important!!!
+            headers: {
+              'Content-Type': 'application/json',
+            },
           }
 
           const req2 = http.request(options, (resp) => {
             let data = ''
-
             resp.on('data', (chunk) => {
               data += chunk
             })
-
             resp.on('end', () => {
-              //TODO: Check that there were no problems with the saving.
               console.log('Data Saved!')
-
-              //res.write('<div id="space"></div>');
-              //res.write('<div id="logo">New recipe saved successfully! </div>');
-              //res.write('<div id="space"></div>');
             })
           })
-          req2.setHeader('content-type', 'application/json')
+
+          req2.on('error', (e) => {
+            console.error(`Problem with request: ${e.message}`)
+          })
+
           req2.write(JSON.stringify(myJSONObject))
           req2.end()
         })
       }
-      //else
-      //********************************************************
+
+      // Display existing recipes
       {
-        //TODO: Check that there were no problems with the saving.
         if (req.method === 'POST') {
           res.write('<div id="space"></div>')
           res.write('<div id="logo">New recipe saved successfully! </div>')
           res.write('<div id="space"></div>')
         }
 
-        //TODO: For simplicity, I opted for a timeout to wait for the save to be completed before reading the recipes (so that the recently saved one is there!). Better sync mechanisms can be used, such as Promises (https://alvarotrigo.com/blog/wait-1-second-javascript/)
         setTimeout(function () {
           const options = {
             hostname: global.gConfig.webservice_host,
@@ -124,37 +121,46 @@ http
             method: 'GET',
           }
 
-          const req = http.request(options, (resp) => {
+          const reqGet = http.request(options, (resp) => {
             let data = ''
-
             resp.on('data', (chunk) => {
               data += chunk
             })
-
             resp.on('end', () => {
-              //console.log(data);
-
               res.write('<div id="space"></div>')
               res.write('<div id="logo">Your Previous Recipes</div>')
               res.write('<div id="space"></div>')
               res.write('<div id="results">Name | Ingredients | PrepTime')
               res.write('<div id="space"></div>')
-              const myArr = JSON.parse(data)
 
-              i = 0
-              while (i < myArr.length) {
-                res.write(myArr[i].name + ' | ' + myArr[i].ingredients + ' | ')
-                res.write(myArr[i].prepTimeInMinutes + '<br/>')
-                i++
+              try {
+                const myArr = JSON.parse(data)
+                let i = 0
+                while (i < myArr.length) {
+                  res.write(myArr[i].name + ' | ' + myArr[i].ingredients + ' | ')
+                  res.write(myArr[i].prepTimeInMinutes + '<br/>')
+                  i++
+                }
+              } catch (e) {
+                res.write('Error loading recipes. Ensure Backend is running.')
               }
-              res.write('</div><div id="space"></div>')
 
+              res.write('</div><div id="space"></div>')
               res.end(endBody)
             })
           })
-          req.end()
+
+          reqGet.on('error', (e) => {
+            console.error(`Problem with request: ${e.message}`)
+            res.write('<div>Could not connect to Backend. Check if the Spring Boot app is running on ' + global.gConfig.webservice_port + '</div>')
+            res.end(endBody)
+          })
+
+          reqGet.end()
         }, timeout)
-      } //end of "else"
+      }
     }
   })
-  .listen(global.gConfig.exposedPort)
+  .listen(global.gConfig.exposedPort, () => {
+    console.log(`FE Server running at http://localhost:${global.gConfig.exposedPort}`)
+  })
