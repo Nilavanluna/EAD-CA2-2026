@@ -7,8 +7,12 @@ on:
   pull_request:
     paths: ['EAD_FE_CA2/**']
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
 env:
-  # ✅ FIXED: Manual lowercase repo name
   IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-fe
 
 jobs:
@@ -24,9 +28,6 @@ jobs:
   build-scan-push:
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +48,7 @@ jobs:
             ${{ env.IMAGE }}:latest
 
       - name: Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
           format: 'sarif'
@@ -55,7 +56,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
 
