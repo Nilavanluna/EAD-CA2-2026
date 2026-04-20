@@ -1,0 +1,55 @@
+---
+# Allow frontend pods to reach backend only on port 8080
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-fe-to-be
+  namespace: recipe-app
+spec:
+  podSelector:
+    matchLabels:
+      app: recipe-be
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: recipe-fe
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow backend pods to reach MongoDB only on port 27017
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-be-to-mongo
+  namespace: recipe-app
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: recipe-be
+      ports:
+        - protocol: TCP
+          port: 27017
+
+---
+# Default deny all other ingress in this namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: recipe-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
