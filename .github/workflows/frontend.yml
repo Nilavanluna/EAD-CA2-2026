@@ -2,10 +2,14 @@ name: Frontend CI/CD (Test → Scan → Build → Deploy)
 
 on:
   push:
-    paths: ['EAD_FE_CA2/**']
+    paths:
+      - 'EAD_FE_CA2/**'
+      - 'EAD_FE_CA2/*' # ✅ Add this
     branches: [main]
   pull_request:
-    paths: ['EAD_FE_CA2/**']
+    paths:
+      - 'EAD_FE_CA2/**'
+      - 'EAD_FE_CA2/*'
 
 permissions:
   contents: read
@@ -58,7 +62,8 @@ jobs:
             ${{ env.IMAGE }}:latest
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: uses: aquasecurity/trivy-action@master
+
         with:
           image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
           format: 'sarif'

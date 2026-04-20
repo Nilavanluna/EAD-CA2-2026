@@ -45,7 +45,8 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0 # ✅ Safe version
+      uses: aquasecurity/trivy-action@master
+
         with:
           image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
           format: 'sarif'
