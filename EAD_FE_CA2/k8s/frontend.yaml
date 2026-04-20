@@ -28,7 +28,7 @@ spec:
         runAsUser: 1001
       containers:
         - name: fe
-          image: ghcr.io/YOUR_GITHUB_USERNAME/ead-ca2-fe:latest
+          image: ghcr.io/nilavanluna/ead-ca2-fe:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 22137
