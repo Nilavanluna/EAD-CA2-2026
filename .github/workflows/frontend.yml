@@ -94,7 +94,7 @@ jobs:
           cluster-name: ca2-aks
 
       - name: Apply Kubernetes Manifests
-        run: kubectl apply -f k8s/ --namespace=recipe-app
+        run: kubectl apply -f EAD_FE_CA2/k8s/ --namespace=recipe-app
 
       - name: Rolling Update — Frontend
         run: |
