@@ -1,16 +1,20 @@
-name: Backend CI/CD (Test → Scan → Build → Deploy)
+name: Backend CI/CD (Test - Scan - Build - Deploy)
+
 on:
   push:
     paths: ['EAD_BE_CA2/**']
     branches: [main]
   pull_request:
     paths: ['EAD_BE_CA2/**']
+
 permissions:
   contents: read
   packages: write
   security-events: write
+
 env:
-  IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be # ✅ FIXED lowercase
+  IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be
+
 jobs:
   test:
     name: Unit Tests
@@ -24,8 +28,9 @@ jobs:
           cache: maven
       - name: Run Maven Tests
         run: cd EAD_BE_CA2 && mvn test
+
   build-scan-push:
-    name: Build, Trivy Scan & Push
+    name: Build, Trivy Scan and Push
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +41,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & Push Image
+      - name: Build and Push Image
         uses: docker/build-push-action@v5
         with:
           context: ./EAD_BE_CA2
@@ -46,7 +51,6 @@ jobs:
             ${{ env.IMAGE }}:latest
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
-
         with:
           image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
           format: 'sarif'
@@ -54,10 +58,11 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
       - name: Upload Trivy SARIF to GitHub Security
-        if: github.event_name == 'push' # ✅ Only main branch
-        uses: github/codeql-action/upload-sarif@v4 # ✅ v4
+        if: github.event_name == 'push'
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
+
   deploy-aks:
     name: Deploy to AKS
     needs: build-scan-push
@@ -76,16 +81,12 @@ jobs:
           cluster-name: ca2-aks
       - name: Apply Kubernetes Manifests
         run: kubectl apply -f EAD_FE_CA2/k8s/ --namespace=recipe-app
-
-      - name: Rolling Update — Backend
+      - name: Rolling Update Backend
         run: |
-          kubectl set image deployment/recipe-be \
-            be=${{ env.IMAGE }}:${{ github.sha }} \
-            -n recipe-app
-          kubectl rollout status deployment/recipe-be \
-            -n recipe-app --timeout=300s
+          kubectl set image deployment/recipe-be be=${{ env.IMAGE }}:${{ github.sha }} -n recipe-app
+          kubectl rollout status deployment/recipe-be -n recipe-app --timeout=300s
       - name: Rollback on Failure
         if: failure()
         run: |
-          echo "Deployment failed — rolling back backend"
+          echo "Deployment failed rolling back backend"
           kubectl rollout undo deployment/recipe-be -n recipe-app
