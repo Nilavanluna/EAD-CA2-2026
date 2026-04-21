@@ -1,4 +1,4 @@
-name: Backend CI/CD (Test - Scan - Build - Deploy)
+name: Backend CI/CD
 
 on:
   push:
@@ -11,9 +11,6 @@ permissions:
   contents: read
   packages: write
   security-events: write
-
-env:
-  IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be
 
 jobs:
   test:
@@ -30,7 +27,7 @@ jobs:
         run: cd EAD_BE_CA2 && mvn test
 
   build-scan-push:
-    name: Build, Trivy Scan and Push
+    name: Build Trivy Scan and Push
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -47,12 +44,12 @@ jobs:
           context: ./EAD_BE_CA2
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:latest
+            ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be:${{ github.sha }}
+            ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be:latest
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
+          image-ref: 'ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be:${{ github.sha }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -83,7 +80,7 @@ jobs:
         run: kubectl apply -f EAD_FE_CA2/k8s/ --namespace=recipe-app
       - name: Rolling Update Backend
         run: |
-          kubectl set image deployment/recipe-be be=${{ env.IMAGE }}:${{ github.sha }} -n recipe-app
+          kubectl set image deployment/recipe-be be=ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-be:${{ github.sha }} -n recipe-app
           kubectl rollout status deployment/recipe-be -n recipe-app --timeout=300s
       - name: Rollback on Failure
         if: failure()
