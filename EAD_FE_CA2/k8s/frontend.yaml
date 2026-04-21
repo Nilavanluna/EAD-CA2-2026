@@ -1,81 +1,87 @@
-name: Frontend CI/CD (Test → Scan → Build → Deploy)
-on:
-  push:
-    paths: ['EAD_FE_CA2/**']
-    branches: [main]
-  pull_request:
-    paths: ['EAD_FE_CA2/**']
-permissions:
-  contents: read
-  packages: write
-  security-events: write
-env:
-  IMAGE: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-fe # ✅ lowercase FIXED
-jobs:
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-      - name: Run NPM Tests
-        run: cd EAD_FE_CA2 && npm ci && npm test
-  build-scan-push:
-    name: Build, Trivy Scan & Push
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & Push Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./EAD_FE_CA2
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:latest
-      - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: '${{ env.IMAGE }}:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-      - name: Upload Trivy SARIF to GitHub Security
-        if: github.event_name == 'push'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: 'trivy-results.sarif'
-  deploy-aks:
-    name: Deploy to AKS
-    needs: build-scan-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: AKS Set Context
-        uses: azure/aks-set-context@v4
-        with:
-          resource-group: ca2-rg
-          cluster-name: ca2-aks
-      - name: Rolling Update — Frontend
-        run: |
-          kubectl set image deployment/recipe-fe \
-            fe=${{ env.IMAGE }}:${{ github.sha }} \
-            -n recipe-app
-          kubectl rollout status deployment/recipe-fe \
-            -n recipe-app --timeout=300s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recipe-fe
+  namespace: recipe-app
+  labels:
+    app: recipe-fe
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: recipe-fe
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: recipe-fe
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: fe
+          image: ghcr.io/nilavanluna/ead-ca2-2026/ead-ca2-fe:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 22137
+          env:
+            - name: WEBSERVICE_HOST
+              value: 'recipe-be-service'
+            - name: WEBSERVICE_PORT
+              value: '8080'
+          resources:
+            requests:
+              cpu: '50m'
+              memory: '128Mi'
+            limits:
+              cpu: '200m'
+              memory: '256Mi'
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 22137
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 22137
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recipe-fe-service
+  namespace: recipe-app
+spec:
+  selector:
+    app: recipe-fe
+  ports:
+    - port: 80
+      targetPort: 22137
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: recipe-fe-hpa
+  namespace: recipe-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: recipe-fe
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
