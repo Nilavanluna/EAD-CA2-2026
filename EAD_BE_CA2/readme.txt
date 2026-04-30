@@ -10,3 +10,5 @@
 	-- Add recipe: 		(POST) /recipe
 	-- Delete recipe: 	(DELETE) /recipe/{name}
  - The default port is 8080. I would suggest to keep it. However, it can be changed in the application.properties file (by adding the line "server.port=9090", where 9090 would be the new port). Be mindful that this change would be needed to be replicated in the FrontEnd (as it currently ASSUMES the BackEnd to be located locally AND in the port 8080).
+
+ adding this ref
